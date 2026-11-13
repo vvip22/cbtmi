@@ -1,0 +1,8 @@
+{
+  "name": "EduExam CBT - Sistem Ujian Semester Online",
+  "description": "Platform ujian semester online komprehensif (CBT) dengan anti-curang, sinkronisasi timer real-time, auto-grade pilihan ganda, koreksi esai guru, live proctoring, rekap Excel, dan cetak rapor PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

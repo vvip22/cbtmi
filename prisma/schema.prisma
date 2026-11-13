@@ -1,0 +1,169 @@
+// Prisma Schema for Sistem Ujian Semester Online (EduExam CBT)
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum QuestionType {
+  MCQ    // Pilihan Ganda
+  ESSAY  // Soal Esai / Uraian
+}
+
+enum SubmissionStatus {
+  ONGOING    // Siswa sedang mengerjakan ujian
+  SUBMITTED  // Ujian telah dikumpulkan, menunggu penilaian esai
+  GRADED     // Selesai dinilai lengkap (Pilihan Ganda auto-grade + Esai manual)
+  DISQUALIFIED // Didiskualifikasi karena melanggar aturan anti-curang
+}
+
+model User {
+  id          String       @id @default(uuid())
+  name        String
+  email       String       @unique
+  password    String       // Hashed password (bcrypt / argon2)
+  role        Role         @default(STUDENT)
+  nisn        String?      @unique // Nomor Induk Siswa Nasional (khusus siswa)
+  nip         String?      @unique // Nomor Induk Pegawai (khusus guru/admin)
+  avatarUrl   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relasi
+  teachingClasses Class[]      @relation("TeacherClasses")
+  submissions     Submission[]
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  name        String   // Contoh: "XII MIPA 1", "XI IPS 2"
+  grade       Int      // 10, 11, atau 12
+  academicYear String  // Contoh: "2026/2027"
+  teacherId   String
+  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relasi
+  exams       Exam[]
+
+  @@index([teacherId])
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String   // Contoh: "Matematika Wajib", "Biologi", "Bahasa Indonesia"
+  code        String   @unique // Contoh: "MAT-XII", "BIO-XII"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relasi
+  exams       Exam[]
+}
+
+model Exam {
+  id                String       @id @default(uuid())
+  title             String       // Contoh: "Penilaian Akhir Semester (PAS) Ganjil"
+  description       String?
+  subjectId         String
+  subject           Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  classId           String
+  class             Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  startTime         DateTime     // Waktu mulai ujian dibuka
+  endTime           DateTime     // Batas akhir ujian dapat diakses
+  duration          Int          // Durasi pengerjaan dalam menit (misal: 60, 90)
+  passingGrade      Float        @default(75.0) // KKM (Kriteria Ketuntasan Minimal)
+  isActive          Boolean      @default(true)
+  randomizeQuestions Boolean     @default(false) // Acak urutan soal per siswa
+  showResults       Boolean      @default(true)  // Tampilkan skor langsung ke siswa
+  maxViolations     Int          @default(3)     // Toleransi pelanggaran anti-curang
+  token             String?      // Token ujian untuk mulai mengerjakan (opsional)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relasi
+  questions         Question[]
+  submissions       Submission[]
+
+  @@index([subjectId])
+  @@index([classId])
+  @@index([isActive])
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  examId        String
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  type          QuestionType @default(MCQ)
+  text          String       // Isi soal (mendukung Markdown & Rich Text)
+  imageUrl      String?      // Gambar diagram / formula / ilustrasi soal
+  options       Json?        // Array opsi untuk Pilihan Ganda: [{ key: 'A', text: '...' }, ...]
+  correctAnswer String?      // Kunci jawaban (A/B/C/D/E untuk MCQ, kata kunci/rubrik esai)
+  points        Float        @default(5.0) // Bobot nilai soal
+  orderIndex    Int          @default(1)
+  explanation   String?      // Pembahasan soal setelah ujian selesai
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relasi
+  answers       Answer[]
+
+  @@index([examId])
+}
+
+model Submission {
+  id              String           @id @default(uuid())
+  examId          String
+  exam            Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId       String
+  student         User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  startedAt       DateTime         @default(now())
+  submittedAt     DateTime?
+  status          SubmissionStatus @default(ONGOING)
+  score           Float            @default(0.0) // Total nilai terhitung
+  mcqScore        Float            @default(0.0) // Subtotal nilai pilihan ganda
+  essayScore      Float            @default(0.0) // Subtotal nilai esai yang dikoreksi
+  violationsCount Int              @default(0)   // Jumlah kecurangan (tab switch/blur)
+  violationsLog   Json?            // Array riwayat pelanggaran [{ timestamp, reason }]
+  teacherNotes    String?          // Catatan evaluasi umum dari guru
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relasi
+  answers         Answer[]
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+}
+
+model Answer {
+  id              String      @id @default(uuid())
+  submissionId    String
+  submission      Submission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  studentAnswer   String?     // Pilihan jawaban siswa (A/B/C/D/E) atau teks esai
+  isFlaggedReview Boolean     @default(false) // Tombol ragu-ragu oleh siswa
+  isCorrect       Boolean?    // Null jika esai belum dinilai, true/false jika MCQ
+  pointsAwarded   Float       @default(0.0) // Poin yang diperoleh untuk jawaban ini
+  teacherFeedback String?     // Ulasan / catatan perbaikan khusus dari guru
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([submissionId, questionId])
+  @@index([submissionId])
+  @@index([questionId])
+}

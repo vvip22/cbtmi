@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-arabic {
+    font-family: 'Traditional Arabic', 'Amiri', 'Noto Naskh Arabic', 'Scheherazade New', 'Arabic Typesetting', Tahoma, serif;
+    line-height: 2.1;
+    font-feature-settings: "cv01" on, "cv02" on;
+  }
+}
+
+/* Custom scrollbars for CBT test questions and exam palette */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Print styles for Rapor Cetak, Kartu, & Jadwal */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* Isolate printable modal content if window.print() is used */
+  #printable-schedule-area,
+  #printable-cards-area {
+    visibility: visible !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    page-break-inside: avoid;
+  }
+  header, footer, nav, button, select, input {
+    display: none !important;
+  }
+}
